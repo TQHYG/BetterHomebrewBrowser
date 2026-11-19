@@ -293,9 +293,12 @@ int ProcessExport(::uint32_t id, const char *name, const char *path, const char 
         ret = SaveFile(path);
 
         notifParam.msg_type = SceLsdbNotificationParam::DownloadComplete; // Send download complete notif
-        notifParam.exec_titleid = "VITASHELL";
-        notifParam.action_type = SceLsdbNotificationParam::AppOpen;
-        notifParam.exec_mode = 0x20000;
+        // No launch target: tapping the notification used to open VitaShell via
+        // exec_titleid = VITASHELL and failed with "application not found" when
+        // it was not installed. action 0 makes a tap do nothing.
+        notifParam.exec_titleid.clear();
+        notifParam.exec_mode = 0;
+        notifParam.action_type = (SceLsdbNotificationParam::Action)0;
         notifParam.icon_path = param->data_icon;
         notifParam.title = name;
         notifParam.new_flag = 1;
@@ -426,9 +429,9 @@ END:
         ret = SaveFile(path);
 
         notifParam.msg_type = SceLsdbNotificationParam::DownloadComplete;
-        notifParam.exec_titleid = "VITASHELL";
-        notifParam.action_type = SceLsdbNotificationParam::AppOpen;
-        notifParam.exec_mode = 0x20000;
+        notifParam.exec_titleid.clear();
+        notifParam.exec_mode = 0;
+        notifParam.action_type = (SceLsdbNotificationParam::Action)0;
         notifParam.icon_path = param->data_icon;
         notifParam.title = name;
         notifParam.new_flag = 1;
@@ -441,19 +444,23 @@ END:
         if(param->type == BGDLTarget_App)
         {
             notifParam.title.clear();
-            notifParam.exec_titleid = installedTitleID;
+            // Was AppHighlight with exec_titleid = installedTitleID. A tap then
+            // opened/highlighted an app the shell could not resolve, which
+            // surfaced as "application not found"; keep the notification but
+            // drop the action so tapping it does nothing.
+            notifParam.exec_titleid.clear();
             notifParam.msg_type = SceLsdbNotificationParam::AppInstalledSuccessfully;
             notifParam.display_type = 1; // Highlight
             notifParam.new_flag = 1;     // ^^
-            notifParam.action_type = SceLsdbNotificationParam::AppHighlight;
+            notifParam.action_type = (SceLsdbNotificationParam::Action)0;
             notifParam.icon_path.clear();
         }
         else if(param->type == BGDLTarget_CompressedFile)
         {
             notifParam.msg_type = SceLsdbNotificationParam::DownloadComplete; // Send download complete notif
-            notifParam.exec_titleid = "VITASHELL";
-            notifParam.action_type = SceLsdbNotificationParam::AppOpen;
-            notifParam.exec_mode = 0x20000;
+            notifParam.exec_titleid.clear();
+            notifParam.exec_mode = 0;
+            notifParam.action_type = (SceLsdbNotificationParam::Action)0;
             notifParam.icon_path = param->data_icon;
             notifParam.title = name;
             notifParam.new_flag = 1;
