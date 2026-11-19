@@ -147,9 +147,8 @@ void AppBrowser::SettingsCB(int id, paf::ui::Handler *handler, paf::ui::Event *e
         // job thread raced with the main thread and crashed the shell.
         // Icon jobs that are still queued hold pointers into the current list,
         // so stop the texture pool from accepting work before tearing the list
-        // down. LoadJob re-enables it once the async queue has drained.
+        // down. LoadJob drains the queue and re-enables the pool.
         workPage->texPool->SetAlive(false);
-        workPage->texPool->RemoveAll();
         Utils::Log("[AppBrowser] switch: texpool quiesced\n");
 
         workPage->ClearList();
