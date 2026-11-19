@@ -196,7 +196,7 @@ namespace
         curl_easy_setopt(handle, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(handle, CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, 15L);
-        curl_easy_setopt(handle, CURLOPT_TIMEOUT, 60L);
+        curl_easy_setopt(handle, CURLOPT_TIMEOUT, 180L);
         curl_easy_setopt(handle, CURLOPT_USE_SSL, CURLUSESSL_ALL);
         curl_easy_setopt(handle, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36");
 

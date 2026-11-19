@@ -42,6 +42,7 @@ add_executable(${PROJECT_NAME}
     src/db/vhbd.cpp
     src/db/cbpsdb.cpp
     src/db/psphbb.cpp
+src/db/neovitadb.cpp
 
     common/bhbb_dl.h
     common/dialog.h

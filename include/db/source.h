@@ -35,6 +35,7 @@ public:
         VITA_DB,
         VHB_DB,
         PSPHBB,
+        NEO_VITA_DB,
     };
 
     struct CategoryInfo 

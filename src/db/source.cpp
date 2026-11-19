@@ -24,6 +24,7 @@
 #include "bhbb_dl.h"
 
 #include "db/vitadb.h"
+#include "db/neovitadb.h"
 #include "db/vhbd.h"
 #include "db/cbpsdb.h"
 #include "db/psphbb.h"
@@ -63,6 +64,9 @@ paf::common::SharedPtr<Source> Source::Create(Source::ID id)
         break;
     case PSPHBB:
         result = paf::common::SharedPtr<Source>(new PSPHBDB());
+        break;
+    case NEO_VITA_DB:
+        result = paf::common::SharedPtr<Source>(new NeoVitaDB());
         break;
     default:
         result = paf::common::SharedPtr<Source>(new VitaDB());
