@@ -193,8 +193,16 @@ int CBPSDB::GetDescription(Source::Entry& entry, paf::wstring& out)
     paf::string resp;
     paf::string url;
 
-    // entry.description holds the description URL as UTF-16
+    // entry.description holds the description URL as UTF-16. The csv uses the
+    // literal string "None" for entries without one, and downloading that as a
+    // url only produced a CURLE_COULDNT_RESOLVE_HOST error.
     common::Utf16ToUtf8(entry.description, &url);
+
+    if(url.size() == 0 || sce_paf_strcmp(url.c_str(), "None") == 0)
+    {
+        out.clear();
+        return 0;
+    }
 
     ret = Utils::HttpGet(url.c_str(), resp);
     if(ret != SCE_OK)
@@ -207,22 +215,9 @@ int CBPSDB::GetDescription(Source::Entry& entry, paf::wstring& out)
 
 int CBPSDB::GetSCECompatibleURL(std::vector<paf::string> &list, paf::string &out)
 {
-    for(auto &url : list)
-    {
-        paf::string httpURL;
-        Utils::HttpsToHttp(url.c_str(), httpURL);
-        print("[CBPSDB::GetSCECompatibleURL] Trying URL: %s...", url.c_str());
-
-        if(Utils::IsValidURLSCE(httpURL.c_str()))
-        {
-            print("OK\n");
-            out = url;
-            return SCE_PAF_OK;
-        }
-        print("FAIL\n");
-    }
-    print("[CBPSDB::GetSCECompatibleURL] No compatible URL found! FAIL\n");
-    return -1;
+    // GitHub release assets redirect to short lived https only signed URLs, so
+    // probed in order: as given, http, resolved chain. See Utils::PickDownloadURL.
+    return Utils::PickDownloadURL(list, out);
 }
 
 int CBPSDB::Parse()

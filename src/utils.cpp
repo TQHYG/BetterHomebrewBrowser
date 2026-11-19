@@ -43,7 +43,7 @@ void Utils::HttpsToHttp(const char *src, paf::string& outURL)
     outURL = common::FormatString("http%s", &src[5]);
 }
 
-bool Utils::IsValidURLSCE(const char *url)
+bool Utils::IsValidURLSCE(const char *url, int *retOut)
 {
     print("[Utils::IsValidURLSCE] START\n");
 
@@ -51,12 +51,25 @@ bool Utils::IsValidURLSCE(const char *url)
     paf::HttpFile::OpenArg openArg;
     SceInt32 ret = SCE_OK;
 
+    if(retOut)
+        *retOut = SCE_OK;
+
+    if(!url || url[0] == 0)
+    {
+        if(retOut)
+            *retOut = -1;
+        return false;
+    }
+
     openArg.ParseUrl(url);
     openArg.SetOption(4000000, HttpFile::OpenArg::OptionType_ResolveTimeOut);
 	openArg.SetOption(10000000, HttpFile::OpenArg::OptionType_ConnectTimeOut);
 
     ret = file.Open(&openArg);
-    
+
+    if(retOut)
+        *retOut = ret;
+
     // if(ret == SCE_HTTP_ERROR_SSL) ret = SCE_OK; // Temporary fix till I figure out wot is going on with this SSL stuff (SceDownload should report proper error anyways)
 
     if(ret == SCE_OK)
@@ -65,6 +78,7 @@ bool Utils::IsValidURLSCE(const char *url)
         return true;
     }
     print("Open %s FAIL 0x%X\n", url, ret);
+    Utils::Log("[Utils::IsValidURLSCE] %s FAIL 0x%X\n", url, ret);
 
     print("[Utils::IsValidURLSCE] END\n");
 
@@ -316,8 +330,11 @@ int Utils::HttpGet(const char *url, paf::string &out)
 {
     out = "";
 
-    if(!url)
+    if(!url || url[0] == 0)
+    {
+        Utils::Log("[Utils::HttpGet] empty url\n");
         return -1;
+    }
 
     CURL *handle = CreateHttpGetHandle(url);
     if(!handle)
@@ -346,8 +363,11 @@ int Utils::HttpGetBinary(const char *url, char **outData, size_t *outSize)
     if(outSize)
         *outSize = 0;
 
-    if(!url || !outData || !outSize)
+    if(!url || !outData || !outSize || url[0] == 0)
+    {
+        Utils::Log("[Utils::HttpGetBinary] empty url\n");
         return -1;
+    }
 
     CURL *handle = CreateHttpGetHandle(url);
     if(!handle)
@@ -379,8 +399,11 @@ int Utils::ResolveFinalURL(const char *url, paf::string &outURL)
 {
     outURL = "";
 
-    if(!url)
+    if(!url || url[0] == 0)
+    {
+        Utils::Log("[Utils::ResolveFinalURL] empty url\n");
         return -1;
+    }
 
     CURL *handle = CreateHttpGetHandle(url);
     if(!handle)
@@ -406,6 +429,76 @@ int Utils::ResolveFinalURL(const char *url, paf::string &outURL)
     outURL = effectiveURL;
 
     return SCE_OK;
+}
+
+int Utils::PickDownloadURL(const std::vector<paf::string> &urls, paf::string &out)
+{
+    paf::string lastResort;
+
+    Utils::Log("[Utils] probing %u download url candidate(s)\n", (unsigned int)urls.size());
+
+    for(auto &url : urls)
+    {
+        int err = 0;
+        paf::string httpURL;
+        paf::string finalURL;
+        paf::string finalHttpURL;
+
+        // 1. exactly as the database provides it (usually https). Works when
+        //    the console has TLS (firmware 3.68+, or vitals / tls_fixer).
+        if(Utils::IsValidURLSCE(url.c_str(), &err))
+        {
+            Utils::Log("[Utils] url ok (as-is): %s\n", url.c_str());
+            out = url;
+            return SCE_PAF_OK;
+        }
+        Utils::Log("[Utils] as-is rejected 0x%X: %s\n", err, url.c_str());
+
+        // 2. plain http downgrade, for consoles without TLS support.
+        Utils::HttpsToHttp(url.c_str(), httpURL);
+        if(Utils::IsValidURLSCE(httpURL.c_str(), &err))
+        {
+            Utils::Log("[Utils] url ok (http): %s\n", httpURL.c_str());
+            out = httpURL;
+            return SCE_PAF_OK;
+        }
+        Utils::Log("[Utils] http rejected 0x%X: %s\n", err, httpURL.c_str());
+
+        // 3. resolve the redirect chain ourselves; SceHttp does not always
+        //    follow 3xx the way curl does.
+        if(Utils::ResolveFinalURL(url.c_str(), finalURL) == SCE_OK)
+        {
+            if(Utils::IsValidURLSCE(finalURL.c_str(), &err))
+            {
+                Utils::Log("[Utils] url ok (resolved): %s\n", finalURL.c_str());
+                out = finalURL;
+                return SCE_PAF_OK;
+            }
+
+            Utils::HttpsToHttp(finalURL.c_str(), finalHttpURL);
+            if(Utils::IsValidURLSCE(finalHttpURL.c_str(), &err))
+            {
+                Utils::Log("[Utils] url ok (resolved http): %s\n", finalHttpURL.c_str());
+                out = finalHttpURL;
+                return SCE_PAF_OK;
+            }
+
+            Utils::Log("[Utils] resolved rejected 0x%X: %s\n", err, finalURL.c_str());
+        }
+
+        if(lastResort.size() == 0)
+            lastResort = url;
+    }
+
+    if(lastResort.size() == 0)
+    {
+        Utils::Log("[Utils] no download url at all\n");
+        return -1;
+    }
+
+    Utils::Log("[Utils] no candidate passed the SceHttp probe, handing %s to SceDownload anyway\n", lastResort.c_str());
+    out = lastResort;
+    return SCE_PAF_OK;
 }
 
 void Utils::Decapitalise(wchar_t *wcstring)

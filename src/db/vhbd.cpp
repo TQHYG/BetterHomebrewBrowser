@@ -89,22 +89,8 @@ VHBD::~VHBD()
 
 int VHBD::GetSCECompatibleURL(std::vector<paf::string> &list, paf::string &out)
 {
-    for(auto &url : list)
-    {
-        paf::string httpURL;
-        Utils::HttpsToHttp(url.c_str(), httpURL);
-        print("[VHBD::GetSCECompatibleURL] Trying URL: %s ...", httpURL.c_str());
-
-        if(Utils::IsValidURLSCE(httpURL.c_str()))
-        {
-            print("OK\n");
-            out = url;
-            return SCE_PAF_OK;
-        }
-        print("FAIL\n");
-    }
-    print("[VHBD::GetSCECompatibleURL] No compatible URL found! FAIL\n");
-    return -1;
+    // Same probing order as CBPSDB, see Utils::PickDownloadURL.
+    return Utils::PickDownloadURL(list, out);
 }
 
 int VHBD::DownloadIndex(bool forceRefresh)

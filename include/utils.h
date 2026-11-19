@@ -20,6 +20,7 @@
 #define _UTILS_H_
 
 #include <paf.h>
+#include <vector>
 
 namespace Utils
 {
@@ -27,7 +28,7 @@ namespace Utils
     SceVoid StartBGDL();
  
     void HttpsToHttp(const char *src, paf::string &outURL);
-    bool IsValidURLSCE(const char *url); //Can this URL be used with SceHttp?
+    bool IsValidURLSCE(const char *url, int *retOut = nullptr); //Can this URL be used with SceHttp?
 
     int DownloadFile(const char *url, const char *path);
     void Decapitalise(wchar_t *wcstring);
@@ -43,5 +44,11 @@ namespace Utils
     int HttpGet(const char *url, paf::string &out);
     int HttpGetBinary(const char *url, char **outData, size_t *outSize); // caller frees with sce_paf_free
     int ResolveFinalURL(const char *url, paf::string &outURL);           // follows redirects, returns effective URL
+
+    // Picks the first candidate that SceHttp can actually open: as given
+    // (https), then the http downgrade, then the resolved redirect target.
+    // If nothing passes the probe the first candidate is returned anyway so
+    // SceDownload can report its own error instead of a generic one here.
+    int PickDownloadURL(const std::vector<paf::string> &urls, paf::string &out);
 };
 #endif
