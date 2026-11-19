@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <stringset>
-    <string src="下载APK" id="download_button_text"/>
+    <string src="下载应用" id="download_button_text"/>
     <string src="下载数据包" id="data_button_text"/>
 
     <string src="全部" id="db_category_all" />
@@ -65,7 +65,7 @@
     <string src="(PayPal link)&#xA;Thank you" id="msg_donate"/>
 
     <string src="安装 - 立即安装（可能需要一些时间）" id="msg_install_desc"/>
-    <string src="保存文件 - 保存文件以便稍后手动安装" id="msg_save_desc"/>
+    <string src="保存文件 - 保存文件到downloads/bhbb/文件夹以便稍后手动安装" id="msg_save_desc"/>
     <string src="安装" id="msg_install"/>
     <string src="保存文件" id="msg_save_file"/>
 </stringset>
