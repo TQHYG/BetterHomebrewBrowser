@@ -32,9 +32,12 @@
 #define NEOVITADB_CATALOG_BASE "https://robin994.github.io/NeoVitaDB-Catalog"
 #define NEOVITADB_INDEX_URL    NEOVITADB_CATALOG_BASE "/vita.json"
 
-// The index is roughly 2.2 MiB of strings and ArduinoJson copies them, so the
-// document needs headroom above the raw size.
-#define NEOVITADB_JSON_CAPACITY (4 * 1024 * 1024)
+// The index is roughly 2.2 MiB. Parsing is zero copy (the input is a mutable
+// char*, so ArduinoJson keeps pointers instead of duplicating every string), so
+// the pool only has to hold the node tree: 1314 entries x ~30 members.
+// A single 4 MiB PAF heap allocation failed on hardware, 2 MiB is the value we
+// log and tune from now on.
+#define NEOVITADB_JSON_CAPACITY (2 * 1024 * 1024)
 
 using namespace paf;
 using namespace paf::common;
@@ -225,12 +228,27 @@ int NeoVitaDB::Parse()
 
     DynamicJsonDocument jdoc(NEOVITADB_JSON_CAPACITY);
 
+    // capacity() is 0 when the pool allocation itself failed, which is a very
+    // different problem from the pool running out while parsing.
+    Utils::Log("[NeoVitaDB] json capacity %u for %u bytes of index\n",
+        (unsigned int)jdoc.capacity(), (unsigned int)indexData.size());
+
+    if(jdoc.capacity() == 0)
+    {
+        Utils::Log("[NeoVitaDB] json pool allocation failed\n");
+        return -1;
+    }
+
     DeserializationError err = deserializeJson(jdoc, indexData.c_str());
     if(err != DeserializationError::Ok)
     {
-        Utils::Log("[NeoVitaDB] json error 0x%X (%s)\n", err.code(), err.c_str());
+        Utils::Log("[NeoVitaDB] json error 0x%X (%s), used %u of %u\n", err.code(), err.c_str(),
+            (unsigned int)jdoc.memoryUsage(), (unsigned int)jdoc.capacity());
         return err.code();
     }
+
+    Utils::Log("[NeoVitaDB] json parsed, used %u of %u\n",
+        (unsigned int)jdoc.memoryUsage(), (unsigned int)jdoc.capacity());
 
     size_t elemCount = jdoc.size();
     Utils::Log("[NeoVitaDB] parsing %u entries\n", (unsigned int)elemCount);
