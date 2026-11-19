@@ -97,33 +97,42 @@ int CBPSDB::DownloadIndex(bool forceRefresh)
     // Simply query github api for commits on the csv file in repo, if new commit, then redownload and save commit.
 
     print("Checking for updates...\n");
-    auto diagText = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_TEXT_MESSAGE_1); // Update dialog
-    diagText->SetString(g_appPlugin->GetString(msg_check_update));
+
+    // Widget updates from a job thread must hold the main thread mutex, otherwise
+    // PAF can wedge the shell UI. This dialog text poking used to happen unlocked
+    // while the data source was being switched.
+    auto SetDialogMessage = [](uint32_t textHash)
+    {
+        thread::RMutex::main_thread_mutex.Lock();
+
+        auto diagText = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_TEXT_MESSAGE_1);
+        if(diagText)
+            diagText->SetString(g_appPlugin->GetString(textHash));
+
+        thread::RMutex::main_thread_mutex.Unlock();
+    };
+
+    SetDialogMessage(msg_check_update);
     
     char buff[4096 + 1]; //Leave 1 char for '\0'
     DynamicJsonDocument jdoc(SCE_KERNEL_32KiB);
     int ret = 0;
     DeserializationError err;
     common::SharedPtr<LocalFile> prevDate;
-    common::SharedPtr<CurlFile> file;
     paf::string resp;
     paf::string commit_sha;
 
-    // Query github API to check for commits
-    file = CurlFile::Open(CBPSDB_COMMIT_URL, SCE_O_RDONLY, 0, &ret); // GetFileSize returns wrong size :(((
-    if(ret < 0)
+    // Query github API to check for commits. Plain libcurl instead of CurlFile:
+    // libPafFileExt.a was built for a newer PAF ABI (int64_t File::GetFileSize /
+    // Seek / WaitAsync) than the 3.57 headers, so reads through it were broken.
+    ret = Utils::HttpGet(CBPSDB_COMMIT_URL, resp);
+    if(ret != SCE_OK)
+    {
+        Utils::Log("[CBPSDB] commit query FAIL 0x%X\n", ret);
         return ret;
+    }
 
     size_t bytesRead;
-    do
-    {
-        sce_paf_memset(buff, 0, sizeof(buff));
-
-        bytesRead = file.get()->Read(buff, 4096);
-        
-        resp += buff;
-    } while(bytesRead > 0);
-
     err = deserializeJson(jdoc, resp.c_str());
 
     if(err != DeserializationError::Ok)
@@ -162,7 +171,7 @@ int CBPSDB::DownloadIndex(bool forceRefresh)
 
 redownload:
     
-    diagText->SetString(g_appPlugin->GetString(msg_wait)); // Update dialog
+    SetDialogMessage(msg_wait);
     
     ret = Utils::DownloadFile(CBPSDB_INDEX_URL, CBPSDB_SAVE_PATH); // Download new index
 
@@ -182,20 +191,14 @@ int CBPSDB::GetDescription(Source::Entry& entry, paf::wstring& out)
 {
     int ret = SCE_OK;
     paf::string resp;
-    char buff[4096 + 1]; // Leave 1 char for null terminator
-    
-    auto file = CurlFile::Open(entry.description.c_str(), &ret, SCE_O_RDONLY);
+    paf::string url;
+
+    // entry.description holds the description URL as UTF-16
+    common::Utf16ToUtf8(entry.description, &url);
+
+    ret = Utils::HttpGet(url.c_str(), resp);
     if(ret != SCE_OK)
         return ret;
-
-    size_t bytesRead;
-    do 
-    {
-        sce_paf_memset(buff, 0, sizeof(buff));
-        bytesRead = file.get()->Read(buff, 4096);    
-    
-        resp += buff;
-    } while(bytesRead > 0);
 
     common::Utf8ToUtf16(resp, &out);
 

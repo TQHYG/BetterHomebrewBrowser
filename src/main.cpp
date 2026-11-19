@@ -47,7 +47,6 @@ extern "C" {
     const int			sceUserMainThreadPriority = SCE_KERNEL_DEFAULT_PRIORITY_USER;
     const unsigned int	sceUserMainThreadStackSize = SCE_KERNEL_THREAD_STACK_SIZE_DEFAULT_USER_MAIN;
 
-    SceUID _vshKernelSearchModuleByName(const char *name, SceUInt64 *unk);
     int curl_global_memmanager_set_np(void *(*allocate)(size_t), void (*deallocate)(void *), void *(*reallocate)(void *, size_t));
 }
 
@@ -66,25 +65,9 @@ SceVoid PluginStart(Plugin *plugin)
     g_appPlugin = plugin;
     print("[bhbb_plugin] Create success! %p\n", plugin);
 
-    SceKernelFwInfo fw;
-    fw.size = sizeof(fw);
-    _vshSblGetSystemSwVersion(&fw);
-    
-    int subVersion = sce_paf_atoi(&fw.versionString[2]); // Too lazy to figure out how fw.version works (lol)
+    // TLS may be provided by the system, iTLS-Enso, tls_fixer, vitals,
+    // or another compatible plugin. Do not require one specific module.
 
-    if(subVersion < 68) // Version 3.68 introduced TLS 1.2 and doesn't need iTLS-Enso
-    {
-        SceUInt64 buff = 0;
-        SceUID itlsID = _vshKernelSearchModuleByName("itlsKernel", &buff);
-        
-        print("iTLS-Enso: 0x%X\n", itlsID);
-        if(itlsID < 0)
-        {
-            new page::TextPage(msg_no_itls);
-            return;
-        }
-    }
-    
     sceShellUtilInitEvents(0);
     
     job::JobQueue::Option opt;

@@ -30,6 +30,9 @@
 
 Source::Source()
 {
+    pList = nullptr;
+    screenshotsSupported = false;
+    id = VITA_DB;
     iconRatio = IconAspectRatio::r1x1;
 }
 
@@ -45,17 +48,34 @@ Source::List::~List()
 
 paf::common::SharedPtr<Source> Source::Create(Source::ID id)
 {
+    paf::common::SharedPtr<Source> result;
+
     switch(id)
     {
     case VITA_DB:
-        return paf::common::SharedPtr<Source>(new VitaDB());
+        result = paf::common::SharedPtr<Source>(new VitaDB());
+        break;
     case VHB_DB:
-        return paf::common::SharedPtr<Source>(new VHBD());
+        result = paf::common::SharedPtr<Source>(new VHBD());
+        break;
     case CBPS_DB:
-        return paf::common::SharedPtr<Source>(new CBPSDB());
+        result = paf::common::SharedPtr<Source>(new CBPSDB());
+        break;
     case PSPHBB:
-        return paf::common::SharedPtr<Source>(new PSPHBDB());
+        result = paf::common::SharedPtr<Source>(new PSPHBDB());
+        break;
+    default:
+        result = paf::common::SharedPtr<Source>(new VitaDB());
+        id = VITA_DB;
+        break;
     }
+
+    // The constructors do not all set this, so stamp the real source id here.
+    // It is only used for logging and for the settings page entry name.
+    if(result.get())
+        result->id = id;
+
+    return result;
 }
 
 const Source::CategoryInfo& Source::GetCategoryByID(int id)
@@ -64,7 +84,7 @@ const Source::CategoryInfo& Source::GetCategoryByID(int id)
         if(cat.id == id)
             return cat;
         
-    const Source::CategoryInfo notFound(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
+    static const Source::CategoryInfo notFound(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
     return notFound;
 }
 
@@ -74,7 +94,7 @@ const Source::CategoryInfo& Source::GetCategoryByHash(uint32_t hash)
         if(cat.nameHash == hash)
             return cat;
         
-    const Source::CategoryInfo notFound(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
+    static const Source::CategoryInfo notFound(0xDEADBEEF, 0xDEADBEEF, 0xDEADBEEF);
     return notFound;
 }
 
@@ -96,15 +116,17 @@ size_t Source::List::GetSize(int category)
     return 0;
 }
 
-Source::Entry& Source::List::Get(uint32_t hash)
+Source::Entry *Source::List::Find(uint32_t hash)
 {
     for(Source::Entry& entry : entries)
-        if(entry.hash == hash) return entry;
+        if(entry.hash == hash) return &entry;
+
+    return nullptr;
 }
 
 Source::List::CategorisedEntries& Source::List::GetCategory(int category)
 {
-    auto errList = List::CategorisedEntries(0xDEADBEEF);
+    static List::CategorisedEntries errList(0xDEADBEEF);
     if(category == Source::CategoryAll)
     {
         print("[Error] Please use the entries property in order to acces an element without a specific category!\n");

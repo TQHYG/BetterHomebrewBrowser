@@ -226,7 +226,7 @@ void Settings::CBOnPageDeactivate(const char *elementId, int32_t type)
 
 }
 
-int32_t Settings::CBOnCheckVisible(const char *elementId, int *pIsVisible)
+int32_t Settings::CBOnCheckVisible(const char *elementId, bool *pIsVisible)
 {
 	*pIsVisible = true;
 

@@ -31,5 +31,17 @@ namespace Utils
 
     int DownloadFile(const char *url, const char *path);
     void Decapitalise(wchar_t *wcstring);
+
+    // Append a formatted line to savedata0:bhbb_log.txt. Unlike print(), this
+    // always runs in release builds, so failures can be diagnosed on device.
+    void Log(const char *fmt, ...);
+
+    // Plain libcurl helpers. These replace paf_file_ext::CurlFile on the
+    // network paths: the prebuilt libPafFileExt.a shipped with the SDK was
+    // compiled against a newer PAF API (int64_t based File::WaitAsync / Seek /
+    // GetFileSize) than the PAF 3.57 headers this build links against.
+    int HttpGet(const char *url, paf::string &out);
+    int HttpGetBinary(const char *url, char **outData, size_t *outSize); // caller frees with sce_paf_free
+    int ResolveFinalURL(const char *url, paf::string &outURL);           // follows redirects, returns effective URL
 };
 #endif

@@ -32,6 +32,8 @@ extern "C" {
 		int unused[2];
 	} SceSysmoduleOpt;
 
+	int _sceSysmoduleLoadModuleInternalWithArg(SceUInt32 id, SceSize args, void *argp, SceSysmoduleOpt *option);
+
 	typedef struct ScePafInit {
 		SceSize global_heap_size;
 		int a2;

@@ -191,7 +191,7 @@
         </template>
 
         <template fast_open="1" id="app_button_list_item_1x1_template">
-            <list_item style="style_list_view_item_generic" id="app_button_list_item">
+            <list_item style="style_list_view_item_generic">
                 <layout_hint size="960, 100" />
                 <image_button sound="_common_sound_image_button" style="list_button_style" enable_long_press_text_auto_scroll="1" id="app_button">
                     <layout_hint size="960, 100" />
@@ -216,7 +216,7 @@
         </template>
 
         <template fast_open="1" id="app_button_list_item_67x37_template">
-            <list_item style="style_list_view_item_generic" id="app_button_list_item">
+            <list_item style="style_list_view_item_generic">
                 <layout_hint size="960, 100" />
                 <image_button sound="_common_sound_image_button" style="list_button_style" enable_long_press_text_auto_scroll="1" id="app_button">
                     <layout_hint size="960, 100" />

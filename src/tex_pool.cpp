@@ -25,6 +25,7 @@
 #include <paf_file_ext.h>
 
 #include "tex_pool.h"
+#include "utils.h"
 
 TexPool::TexPool(Plugin *_cbPlugin)
 {
@@ -287,36 +288,44 @@ void TexPool::RemoveForReplace(IDParam const& id)
 
 bool TexPool::AddHttp(IDParam const& id, const char *path)
 {
-	int32_t res = -1;
-	CurlFile::OpenArg oarg;
-	oarg.ParseUrl(path);
-	oarg.SetOption(3000, CurlFile::OpenArg::OptionType_ConnectTimeOut);
-	oarg.SetOption(5000, CurlFile::OpenArg::OptionType_RecvTimeOut);
-	if (share)
-	{
-		oarg.SetShare(share);
-	}
-
 	if (!alive)
 	{
 		return false;
 	}
-	CurlFile *file = new CurlFile();
-	res = file->Open(&oarg);
-	if (res != SCE_PAF_OK)
+
+	// Fetch the image with plain libcurl and decode it from memory. CurlFile is
+	// unusable here: libPafFileExt.a was built for a newer PAF ABI (int64_t
+	// File::GetFileSize / Seek / WaitAsync) than the 3.57 headers we build with,
+	// so reading/seeking through it returned garbage on this build.
+	char *data = nullptr;
+	size_t dataSize = 0;
+
+	if (Utils::HttpGetBinary(path, &data, &dataSize) != SCE_OK)
 	{
-		delete file;
 		Remove(id);
 		return false;
 	}
 
 	if (!alive)
 	{
-		delete file;
+		sce_paf_free(data);
 		return false;
 	}
-	common::SharedPtr<CurlFile> hfile(file);
-	intrusive_ptr<graph::Surface> tex = graph::Surface::Load(gutil::GetDefaultSurfacePool(), (common::SharedPtr<File>&)hfile);
+
+	int32_t res = -1;
+	common::SharedPtr<MemFile> mfile = MemFile::Open((uint8_t *)data, dataSize, &res);
+	if (res != SCE_PAF_OK)
+	{
+		sce_paf_free(data);
+		Remove(id);
+		return false;
+	}
+
+	intrusive_ptr<graph::Surface> tex = graph::Surface::Load(gutil::GetDefaultSurfacePool(), (common::SharedPtr<File>&)mfile);
+
+	mfile.reset();
+	sce_paf_free(data);
+
 	if (tex.get())
 	{
 		storMtx->Lock();
@@ -325,8 +334,6 @@ bool TexPool::AddHttp(IDParam const& id, const char *path)
 		storMtx->Unlock();
 		return true;
 	}
-
-	// Remove(id);
 
 	return false;
 }

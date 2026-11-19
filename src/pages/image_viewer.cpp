@@ -25,6 +25,7 @@
 #include "common.h"
 #include "dialog.h"
 #include "print.h"
+#include "utils.h"
 
 using namespace paf;
 using namespace common;
@@ -53,32 +54,41 @@ void ImageViewer::LoadAsync(const char *path)
 
 int ImageViewer::LoadNet(const char *path)
 {
-    int32_t res = -1;
-	CurlFile::OpenArg oarg;
-	oarg.ParseUrl(path);
-	oarg.SetOption(3000, CurlFile::OpenArg::OptionType_ConnectTimeOut);
-	oarg.SetOption(5000, CurlFile::OpenArg::OptionType_RecvTimeOut);
-    
-	CurlFile *file = new CurlFile();
-	res = file->Open(&oarg);
-	if (res != SCE_PAF_OK)
+	// Download into memory with plain libcurl and decode from there. CurlFile is
+	// not usable on this build: libPafFileExt.a was compiled against a newer PAF
+	// ABI (int64_t File::GetFileSize / Seek / WaitAsync) than the 3.57 headers.
+	char *data = nullptr;
+	size_t dataSize = 0;
+
+	int32_t res = Utils::HttpGetBinary(path, &data, &dataSize);
+	if(res != SCE_OK)
 	{
-		delete file;
-        print("Failed to open curl file: 0x%X\n", res);
+		print("Failed to download image: 0x%X\n", res);
 		return res;
 	}
 
-	common::SharedPtr<CurlFile> hfile(file);
-    auto tex = graph::Surface::Load(gutil::GetDefaultSurfacePool(), (common::SharedPtr<File>&)hfile);
-    if(tex.get())
-    {
-        auto plane = root->FindChild(picture);
-        plane->SetTexture(tex, 0, 0);
-        plane->SetColor(1,1,1,1);        
-        return 0;
-    }
-    
-    return -1;
+	res = -1;
+	common::SharedPtr<MemFile> mfile = MemFile::Open((uint8_t *)data, dataSize, &res);
+	if(res != SCE_PAF_OK)
+	{
+		sce_paf_free(data);
+		return res;
+	}
+
+	intrusive_ptr<graph::Surface> tex = graph::Surface::Load(gutil::GetDefaultSurfacePool(), (common::SharedPtr<File>&)mfile);
+
+	mfile.reset();
+	sce_paf_free(data);
+
+	if(tex.get())
+	{
+		auto plane = root->FindChild(picture);
+		plane->SetTexture(tex, 0, 0);
+		plane->SetColor(1,1,1,1);
+		return 0;
+	}
+
+	return -1;
 }
 
 int ImageViewer::LoadLocal(const char *path)

@@ -117,7 +117,7 @@ public:
         }
 
         size_t GetSize(int categoryID = -1);
-        Source::Entry& Get(uint32_t hash);
+        Source::Entry *Find(uint32_t hash);
         CategorisedEntries& GetCategory(int categoryID);
         
         std::vector<Source::Entry> entries;

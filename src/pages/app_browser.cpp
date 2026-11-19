@@ -130,10 +130,42 @@ void AppBrowser::SettingsCB(int id, paf::ui::Handler *handler, paf::ui::Event *e
     switch(elemHash)
     {
     case list_source:
+        // A running load/parse job still references the current source and list.
+        // Replacing either here would leave worker and icon jobs with dangling pointers.
+        if(workPage->loading)
+        {
+            Utils::Log("[AppBrowser] source switch ignored, load in progress\n");
+            return;
+        }
+
         Settings::GetInstance()->Close();
+
+        Utils::Log("[AppBrowser] source switch requested -> %d\n", (int)iVal);
+
+        // The swap must happen on this (main) thread. SetSource() reopens the
+        // category button templates and drives transitions; doing that from a
+        // job thread raced with the main thread and crashed the shell.
+        // Icon jobs that are still queued hold pointers into the current list,
+        // so stop the texture pool from accepting work before tearing the list
+        // down. LoadJob re-enables it once the async queue has drained.
+        workPage->texPool->SetAlive(false);
+        workPage->texPool->RemoveAll();
+        Utils::Log("[AppBrowser] switch: texpool quiesced\n");
+
         workPage->ClearList();
+        Utils::Log("[AppBrowser] switch: list cleared\n");
+
+        // SetCategory() bails out while the list view is empty, so reset the
+        // stored category directly; a category id from the previous source would
+        // otherwise survive the switch and the new list would render empty.
+        workPage->category = Source::CategoryAll;
+        workPage->targetList = &workPage->appList;
+
         workPage->SetSource(Source::Create((Source::ID)iVal));
+        Utils::Log("[AppBrowser] switch: source set\n");
+
         workPage->Load();
+        Utils::Log("[AppBrowser] switch: load queued\n");
         break;
     
     case button_dl_dev:
@@ -339,12 +371,14 @@ void AppBrowser::CategoryCB(int eventID, paf::ui::Handler *widget, paf::ui::Even
 
 void AppBrowser::SetSource(paf::common::SharedPtr<Source> tSource)
 {
-    if(source.get() == tSource.get()) return;
+    if(!tSource.get() || tSource->categories.empty() || source.get() == tSource.get()) return;
 
     // update source
     source = tSource;
 
     source->pList = &appList; // Reset list (probably done later on too, but just to be sure)
+
+    Utils::Log("[AppBrowser] source applied, id=%d categories=%u\n", (int)source->id, (unsigned int)source->categories.size());
 
     // Update category widgets
 
@@ -413,7 +447,9 @@ void AppBrowser::EntryCB(int eventID, paf::ui::Handler *widget, paf::ui::Event *
     auto workWidget = (ui::Widget *)widget;
     
     workPage->searchBox->EndEdit();
-    new AppViewer(workPage->appList.Get(workWidget->GetName().GetIDHash()), workPage->texPool);
+    Source::Entry *entry = workPage->appList.Find(workWidget->GetName().GetIDHash());
+    if(entry)
+        new AppViewer(*entry, workPage->texPool);
 }
 
 void AppBrowser::EntryFactory::TextureCB(bool success, paf::ui::Widget *target, Source::Entry *workItem, TexPool *workPool)
@@ -570,6 +606,7 @@ void AppBrowser::ParseThread::EntryFunction()
     if(ret != SCE_OK)
     {
         print("[AppBrowser::ParseThread] source->Parse FAIL! 0x%X\n", ret);
+        Utils::Log("[AppBrowser] parse FAIL 0x%X\n", ret);
         dialog::OpenError(g_appPlugin, ret, g_appPlugin->GetString(msg_error_parse));
         workPage->refreshButton->Enable(0);
         workPage->optionsButton->Show(transition::Type_Reset);
@@ -598,6 +635,7 @@ void AppBrowser::ParseThread::EntryFunction()
     // Add items to list view
     workPage->CreateList();
     print("[AppBrowser::ParseThread] Created list\n");
+    Utils::Log("[AppBrowser] list ready, %u entries\n", (unsigned int)workPage->targetList->GetSize(workPage->GetCategory()));
 
     workPage->refreshButton->Enable(0);
     workPage->optionsButton->Show(transition::Type_Reset);
@@ -635,6 +673,11 @@ void AppBrowser::LoadJob::Run()
     pPage->appList.Clear();
     pPage->searchList.Clear();
 
+    // SetCategory() bails out while the list view is empty, so reset the stored
+    // category directly; otherwise a category id from the previous source would
+    // survive the switch and the new list would render empty.
+    pPage->category = Source::CategoryAll;
+    pPage->targetList = &pPage->appList;
     pPage->SetCategory(Source::CategoryAll);
 
     RMutex::main_thread_mutex.Unlock();
@@ -654,6 +697,7 @@ void AppBrowser::LoadJob::Run()
     if(ret != SCE_OK)
     {
         print("[AppBrowser::LoadJob] source->DownloadIndex FAIL! 0x%X\n", ret);
+        Utils::Log("[AppBrowser] DownloadIndex FAIL 0x%X\n", ret);
         dialog::OpenError(g_appPlugin, ret, g_appPlugin->GetString(msg_error_index));
         pPage->refreshButton->Enable(0);
         pPage->optionsButton->Show(transition::Type_Reset);
@@ -704,7 +748,13 @@ bool AppBrowser::TexPool::Add(Source::Entry *workItem, bool allowReplace, int *r
         }
     }
 
-    return AddLocal(workItem->hash, workItem->iconPath.c_str());
+    bool result = AddLocal(workItem->hash, workItem->iconPath.c_str());
+    if(!result)
+    {
+        // A zero-length or undecodable cache file must not suppress retries.
+        LocalFile::RemoveFile(workItem->iconPath.c_str());
+    }
+    return result;
 }
 
 void AppBrowser::TexPool::ListIconJob::Run()

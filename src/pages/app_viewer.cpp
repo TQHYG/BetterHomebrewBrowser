@@ -30,6 +30,7 @@
 #include "pages/image_viewer.h"
 #include "downloader.h"
 #include "bhbb_dl.h"
+#include "utils.h"
 
 using namespace paf;
 using namespace common;
@@ -275,6 +276,7 @@ void AppViewer::DownloadJob::Run()
     if(ret != SCE_PAF_OK)
     {
         print("[AppViewer::DownloadJob] Obtain URL FAIL! 0x%X\n", ret);
+        Utils::Log("[AppViewer] obtain url FAIL 0x%X (type %d)\n", ret, (int)type);
         dialog::Close();
         dialog::OpenError(g_appPlugin, ret, g_appPlugin->GetString(msg_download_error));
         sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);
@@ -282,6 +284,8 @@ void AppViewer::DownloadJob::Run()
     }
     
     ret = Downloader::GetCurrentInstance()->Enqueue(g_appPlugin, url.c_str(), appName.GetString().c_str(), workPage->app.iconPath.c_str(), &dlParam);
+
+    Utils::Log("[AppViewer] enqueue -> 0x%X url=%s\n", ret, url.c_str());
 
     dialog::Close();
     sceShellUtilUnlock(SCE_SHELL_UTIL_LOCK_TYPE_PS_BTN);

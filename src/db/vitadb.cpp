@@ -164,42 +164,53 @@ int VitaDB::DownloadIndex(bool forceRefresh)
 
 int VitaDB::GetSCECompatibleURL(std::vector<paf::string> &urlList, paf::string &out)
 {
-    int ret = -1;
+    paf::string firstCandidate;
+
+    if(urlList.size() == 0)
+    {
+        Utils::Log("[VitaDB] entry has no download url\n");
+        return -1;
+    }
+
     for(auto& url : urlList)
     {
-        // First use curl to get the redirected URL
-        
-        // Open file
-        auto file = CurlFile::Open(url.c_str(), SCE_O_RDONLY, 0, &ret);
-
-        print("[VitaDB::GetSCECompatibleURL] CurlFileOpen(%s) -> 0x%X\n", url.c_str(), ret);
-        print("FileSize: %llu\n", file.get()->GetFileSize());
-        if(ret != SCE_PAF_OK)
-            continue; // Try next URL
-
-        // Get URL
-        char *redirectURL = nullptr;
-        ret = curl_easy_getinfo(file.get()->curl, CURLINFO_EFFECTIVE_URL, &redirectURL);
-
-        print("[VitaDB::GetSCECompatibleURL] getinfo(CURLINFO_EFFECTIVE_URL) -> 0x%X (%s)\n", ret, redirectURL);
-
-        if(ret != CURLE_OK || redirectURL == nullptr)
+        // Resolve the redirect chain with plain libcurl. This used to go through
+        // CurlFile, but the prebuilt libPafFileExt.a in the SDK was compiled
+        // against a newer PAF API (int64_t File::GetFileSize / Seek / WaitAsync),
+        // so reading and seeking through it returned bogus values on 3.57.
+        paf::string finalURL;
+        if(Utils::ResolveFinalURL(url.c_str(), finalURL) != SCE_OK)
             continue;
 
         paf::string httpURL;
-        Utils::HttpsToHttp(redirectURL, httpURL); // Convert our URL from https to http
+        Utils::HttpsToHttp(finalURL.c_str(), httpURL); // SceDownload needs plain http
 
-        print("[VitaDB::GetSCECompatibleURL] Utils::HttpsToHttp -> %s\n", httpURL.c_str());
+        Utils::Log("[VitaDB] resolved %s -> %s\n", url.c_str(), httpURL.c_str());
 
-        // Finally, check if it can be used with plain SCE download methods
         if(Utils::IsValidURLSCE(httpURL.c_str()))
         {
-            // Great! We can use this to download
+            Utils::Log("[VitaDB] url accepted: %s\n", httpURL.c_str());
             out = httpURL;
             return SCE_PAF_OK;
         }
+
+        if(firstCandidate.size() == 0)
+            firstCandidate = httpURL;
+
+        Utils::Log("[VitaDB] url rejected by SceHttp: %s\n", httpURL.c_str());
     }
 
+    // Nothing passed the reachability probe (SceHttp is picky about redirects
+    // and TLS). Hand the first candidate to SceDownload anyway so that the
+    // background downloader reports its own error instead of failing here.
+    if(firstCandidate.size() != 0)
+    {
+        Utils::Log("[VitaDB] falling back to %s\n", firstCandidate.c_str());
+        out = firstCandidate;
+        return SCE_PAF_OK;
+    }
+
+    Utils::Log("[VitaDB] no viable download url (%u candidates)\n", (unsigned int)urlList.size());
     return -1;
 }
 

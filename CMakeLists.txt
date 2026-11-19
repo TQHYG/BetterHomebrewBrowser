@@ -7,6 +7,8 @@ include(VitaDevelopmentSuite)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_CXX_STANDARD 11)
 
+add_compile_definitions(Type_Fadein1=Type_FadeinFast Type_Fadein2=Type_FadeinSlow)
+
 add_subdirectory(bhbb_dl)
 
 if(${CMAKE_BUILD_TYPE} STREQUAL Debug)
@@ -158,7 +160,8 @@ endforeach()
 add_custom_command(
     OUTPUT ${CMAKE_BINARY_DIR}/bhbb_plugin.rco ${CMAKE_SOURCE_DIR}/include/bhbb_plugin.h
     DEPENDS ${CMAKE_SOURCE_DIR}/resource/bhbb_plugin.xml ${CMAKE_SOURCE_DIR}/resource/file/bhbb_settings.xml ${rcsFiles}
-    COMMAND $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/acdc.exe -c -i ${CMAKE_SOURCE_DIR}/resource/bhbb_plugin.xml -s $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/rco.cxmldef -r ${CMAKE_BINARY_DIR}/bhbb_plugin.rcd -o ${CMAKE_BINARY_DIR}/bhbb_plugin.rco -x ${CMAKE_SOURCE_DIR}/include/bhbb_plugin.h
+    COMMAND $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/acdc.exe -c -i ${CMAKE_SOURCE_DIR}/resource/bhbb_plugin.xml -s $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/rco.cxmldef -r ${CMAKE_BINARY_DIR}/bhbb_plugin.rcd -o ${CMAKE_BINARY_DIR}/bhbb_plugin.rco
+    COMMAND py $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/genhashheaders.py ${CMAKE_SOURCE_DIR}/resource/bhbb_plugin.xml ${CMAKE_SOURCE_DIR}/include/bhbb_plugin.h
     #COMMAND python $ENV{SCE_PSP2_SDK_DIR}/host_tools/build/cxml/appinfo/appinfo_compiler.py -o ${CMAKE_BINARY_DIR}/bhbb_plugin.rco ${CMAKE_SOURCE_DIR}/resource/bhbb_plugin.xml # -x ${CMAKE_SOURCE_DIR}/include/bhbb_plugin.h
 )
 
@@ -183,6 +186,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
   ${CMAKE_SOURCE_DIR}/common
   ${VDSUITE_USER_INCLUDE_DIRECTORIES}
   ${VDSUITE_STANDARD_INCLUDE_DIRECTORIES}
+  $ENV{SCE_PSP2_SDK_DIR}/target/include/vdsuite/user/psp2_compat
   $ENV{SCE_PSP2_SDK_DIR}/target/include
   $ENV{SCE_PSP2_SDK_DIR}/target/include_common
 )

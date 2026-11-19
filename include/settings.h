@@ -60,7 +60,7 @@ private:
 
     static void CBOnPageDeactivate(const char *elementId, int32_t type);
 
-    static int32_t CBOnCheckVisible(const char *elementId, int *pIsVisible);
+    static int32_t CBOnCheckVisible(const char *elementId, bool *pIsVisible);
 
     static int32_t CBOnPreCreate(const char *elementId, sce::AppSettings::Element *element);
 

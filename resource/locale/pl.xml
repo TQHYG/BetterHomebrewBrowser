@@ -59,7 +59,6 @@
     <string src="Najczęściej pobierane" id="msg_sort_mostdownloaded"/>
     <string src="Najrzadziej pobierane" id="msg_sort_leastdownloaded"/>
 
-    <string src="Podziękowania" id="msg_settings_credits"/>
         
     <string src="Twórcy" id="msg_settings_credits"/>
 

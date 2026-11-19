@@ -110,31 +110,41 @@ int VHBD::GetSCECompatibleURL(std::vector<paf::string> &list, paf::string &out)
 int VHBD::DownloadIndex(bool forceRefresh)
 {
     print("Checking for updates...\n");
-    
-    auto diagText = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_TEXT_MESSAGE_1); 
-    
-    diagText->SetString(g_appPlugin->GetString(msg_check_update));
+
+    // Widget updates from a job thread must hold the main thread mutex, otherwise
+    // PAF can wedge the shell UI (this ran unlocked while switching data source).
+    auto SetDialogMessage = [](uint32_t textHash)
+    {
+        thread::RMutex::main_thread_mutex.Lock();
+
+        auto diagText = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_TEXT_MESSAGE_1);
+        if(diagText)
+            diagText->SetString(g_appPlugin->GetString(textHash));
+
+        thread::RMutex::main_thread_mutex.Unlock();
+    };
+
+    SetDialogMessage(msg_check_update);
+
     // Query github API to check for new release with 'latest' tag
     DynamicJsonDocument jdoc(SCE_KERNEL_32KiB);
     
     int ret = 0;
     DeserializationError err;
-    
-    auto file = CurlFile::Open(VHBD_RELEASE_URL, SCE_O_RDONLY, 0, &ret); // GetFileSize returns wrong size :(((
-    if(ret < 0)
-        return ret;
 
     paf::string resp;
     int bytesRead;
     char buff[4096 + 1]; //Leave 1 char for '\0'
-    do
-    {
-        sce_paf_memset(buff, 0, sizeof(buff));
 
-        bytesRead = file.get()->Read(buff, 4096);
-        
-        resp += buff;
-    } while(bytesRead > 0);
+    // Plain libcurl instead of CurlFile: libPafFileExt.a was built against a
+    // newer PAF ABI (int64_t File::GetFileSize / Seek / WaitAsync) than the
+    // 3.57 headers, so CurlFile reads returned broken data on this build.
+    ret = Utils::HttpGet(VHBD_RELEASE_URL, resp);
+    if(ret != SCE_OK)
+    {
+        Utils::Log("[VHBD] release query FAIL 0x%X\n", ret);
+        return ret;
+    }
 
     err = deserializeJson(jdoc, resp.c_str());
 
@@ -178,7 +188,7 @@ asset_found:
         return 0; // Do not redownload!
     
 redownload:
-    diagText->SetString(g_appPlugin->GetString(msg_wait)); // Update dialog
+    SetDialogMessage(msg_wait);
     ret = Utils::DownloadFile(download_url.c_str(), VHBD_SAVE_PATH); // Download new index
     
     // Reset file handler & save new download time

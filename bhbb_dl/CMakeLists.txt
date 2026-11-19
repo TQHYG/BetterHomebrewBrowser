@@ -79,6 +79,7 @@ target_link_directories(${PROJECT_NAME} PRIVATE
 target_include_directories(${PROJECT_NAME} PRIVATE
     ../common
     include
+    src
     ${VDSUITE_USER_INCLUDE_DIRECTORIES}
     ${VDSUITE_STANDARD_INCLUDE_DIRECTORIES}
     $ENV{SCE_PSP2_SDK_DIR}/target/include
