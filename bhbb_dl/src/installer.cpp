@@ -32,7 +32,7 @@
 using namespace paf;
 
 #define EXTRACT_PATH "ux0:data/bhbb_prom/"
-#define SAVE_PATH "ux0:/bhbb_downloads/"
+#define SAVE_PATH "ux0:/downloads/bhbb/"
 
 #define ERROR_LOW_SPACE     -0x50000001
 #define ERROR_OPENING_CF    -0x50000002
