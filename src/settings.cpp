@@ -133,6 +133,12 @@ Settings::Settings()
     //Get values
     appSettings->GetInt("source", (int *)&source, d_source);
 
+    // The debug log is off unless the user turned it on in the settings page.
+    ret = d_log;
+    appSettings->GetInt("log", &ret, d_log);
+    log = ret;
+    Utils::SetLogEnabled(log != 0);
+
     paf::wstring *verinfo = new paf::wstring();
 
 #ifdef _DEBUG

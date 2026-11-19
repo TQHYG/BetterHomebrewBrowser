@@ -68,4 +68,7 @@
     <string src="保存文件 - 保存文件到downloads/bhbb/文件夹以便稍后手动安装" id="msg_save_desc"/>
     <string src="安装" id="msg_install"/>
     <string src="保存文件" id="msg_save_file"/>
+    <string src="调试日志" id="msg_settings_log"/>
+    <string src="关闭" id="msg_settings_log_off"/>
+    <string src="开启" id="msg_settings_log_on"/>
 </stringset>

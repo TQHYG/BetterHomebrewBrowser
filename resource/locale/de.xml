@@ -70,4 +70,7 @@
     <string src="Datei speichern - Datei speichern, um sie später manuell zu installieren" id="msg_save_desc"/>
     <string src="Installieren" id="msg_install"/>
     <string src="Datei speichern" id="msg_save_file"/>
+    <string src="Debug-Protokoll" id="msg_settings_log"/>
+    <string src="Aus" id="msg_settings_log_off"/>
+    <string src="Ein" id="msg_settings_log_on"/>
 </stringset>

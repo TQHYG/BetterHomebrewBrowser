@@ -69,4 +69,7 @@
     <string src="Сохранить файл - сохранить для ручной установки позже" id="msg_save_desc"/>
     <string src="Установить" id="msg_install"/>
     <string src="Сохранить файл" id="msg_save_file"/>
+    <string src="Журнал отладки" id="msg_settings_log"/>
+    <string src="Выкл." id="msg_settings_log_off"/>
+    <string src="Вкл." id="msg_settings_log_on"/>
 </stringset>

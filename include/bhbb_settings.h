@@ -10,6 +10,9 @@
 #define list_source_02 0x2D5A2E6B
 #define list_source_03 0xFD1C515D
 #define list_source_04 0x235D386B
+#define list_log 0xA140025E
+#define list_log_00 0x5D2A9526
+#define list_log_01 0x33F60156
 #define verinfo_setting 0x45EB30EB
 #define label_verinfo 0x804FF666
 #define credits_setting 0x65B3A7E9

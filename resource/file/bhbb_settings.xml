@@ -9,6 +9,10 @@
             <list_item id="list_source_03" title="db_name_3" value="3" />
             <list_item id="list_source_04" title="db_name_4" value="4" />
         </list>
+        <list id="list_log" title="msg_settings_log" key="log" default_value="0">
+            <list_item id="list_log_00" title="msg_settings_log_off" value="0" />
+            <list_item id="list_log_01" title="msg_settings_log_on" value="1" />
+        </list>
 		<setting_list id="verinfo_setting" title="msg_settings_verinfo" icon="tex_spanner" style="edit">
 		    <label id="label_verinfo" title="msg_verinfo" style="heading" />
 	    </setting_list>

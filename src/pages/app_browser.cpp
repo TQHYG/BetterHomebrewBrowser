@@ -167,6 +167,21 @@ void AppBrowser::SettingsCB(int id, paf::ui::Handler *handler, paf::ui::Event *e
         Utils::Log("[AppBrowser] switch: load queued\n");
         break;
     
+    case list_log:
+        // Toggle the on device log. Applied immediately, and persisted by the
+        // settings plugin under the "log" key.
+        if(iVal != 0)
+        {
+            Utils::SetLogEnabled(true);
+            Utils::Log("[AppBrowser] log enabled\n");
+        }
+        else
+        {
+            Utils::Log("[AppBrowser] log disabled\n");
+            Utils::SetLogEnabled(false);
+        }
+        break;
+
     case button_dl_dev:
         print("Downloading test app...\n");
         BGDLParam param;

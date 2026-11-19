@@ -50,6 +50,7 @@ public:
     static void OpenCB(int id, paf::ui::Handler *widget, paf::ui::Event *event, void *data);
 
     int source;
+    int log;
 
 private:
     static sce::AppSettings *appSettings;
@@ -78,6 +79,7 @@ private:
 
     const int d_settingsVersion = 2; 
     const int d_source = Source::VITA_DB;
+    const int d_log = 0;
 };
 
 #endif

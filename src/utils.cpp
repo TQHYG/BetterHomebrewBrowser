@@ -259,8 +259,23 @@ int Utils::DownloadFile(const char *url, const char *dest)
 #define BHBB_LOG_PATH "ux0:/data/betterHomebrewBrowser/bhbb_log.txt"
 #define BHBB_LOG_MAX  (256 * 1024)
 
+static bool s_logEnabled = false;
+
+void Utils::SetLogEnabled(bool enabled)
+{
+    s_logEnabled = enabled;
+}
+
+bool Utils::IsLogEnabled()
+{
+    return s_logEnabled;
+}
+
 void Utils::Log(const char *fmt, ...)
 {
+    if(!s_logEnabled)
+        return;
+
     static bool ready = false;
     static paf::thread::Mutex *logMutex = nullptr;
 

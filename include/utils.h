@@ -28,6 +28,10 @@ namespace Utils
     // Unlike print(), this always runs in release builds, so failures can be
     // diagnosed on device.
     void Log(const char *fmt, ...);
+    // Logging is off by default and controlled by the settings page, so a
+    // normal run does not write anything to the memory card.
+    void SetLogEnabled(bool enabled);
+    bool IsLogEnabled();
     // Plain libcurl helpers. These replace paf_file_ext::CurlFile on the
     // network paths: the prebuilt libPafFileExt.a shipped with the SDK was
     // compiled against a newer PAF API (int64_t based File::WaitAsync / Seek /
