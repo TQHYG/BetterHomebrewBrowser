@@ -28,7 +28,7 @@ namespace Utils
     SceVoid StartBGDL();
  
     void HttpsToHttp(const char *src, paf::string &outURL);
-    bool IsValidURLSCE(const char *url, int *retOut = nullptr); //Can this URL be used with SceHttp?
+    bool IsValidURLSCE(const char *url, int32_t timeoutMs = 5000, int *retOut = nullptr); //Can this URL be used with SceHttp?
 
     int DownloadFile(const char *url, const char *path);
     void Decapitalise(wchar_t *wcstring);
@@ -45,10 +45,17 @@ namespace Utils
     int HttpGetBinary(const char *url, char **outData, size_t *outSize); // caller frees with sce_paf_free
     int ResolveFinalURL(const char *url, paf::string &outURL);           // follows redirects, returns effective URL
 
-    // Picks the first candidate that SceHttp can actually open: as given
-    // (https), then the http downgrade, then the resolved redirect target.
-    // If nothing passes the probe the first candidate is returned anyway so
-    // SceDownload can report its own error instead of a generic one here.
+    // Picks the url handed to SceDownload for a download.
+    //
+    // For every candidate the redirect chain is resolved first (so jump links
+    // like get_hb_url.php or github release assets become direct file urls),
+    // then up to four 5s probes are run in this order:
+    //   1. resolved url as-is (https preferred)
+    //   2. resolved url with the http downgrade
+    //   3. original url as-is
+    //   4. original url with the http downgrade
+    // If nothing passes, the resolved http form is handed over anyway so that
+    // bgdl can report its own error instead of failing locally.
     int PickDownloadURL(const std::vector<paf::string> &urls, paf::string &out);
 };
 #endif

@@ -164,54 +164,10 @@ int VitaDB::DownloadIndex(bool forceRefresh)
 
 int VitaDB::GetSCECompatibleURL(std::vector<paf::string> &urlList, paf::string &out)
 {
-    paf::string firstCandidate;
-
-    if(urlList.size() == 0)
-    {
-        Utils::Log("[VitaDB] entry has no download url\n");
-        return -1;
-    }
-
-    for(auto& url : urlList)
-    {
-        // Resolve the redirect chain with plain libcurl. This used to go through
-        // CurlFile, but the prebuilt libPafFileExt.a in the SDK was compiled
-        // against a newer PAF API (int64_t File::GetFileSize / Seek / WaitAsync),
-        // so reading and seeking through it returned bogus values on 3.57.
-        paf::string finalURL;
-        if(Utils::ResolveFinalURL(url.c_str(), finalURL) != SCE_OK)
-            continue;
-
-        paf::string httpURL;
-        Utils::HttpsToHttp(finalURL.c_str(), httpURL); // SceDownload needs plain http
-
-        Utils::Log("[VitaDB] resolved %s -> %s\n", url.c_str(), httpURL.c_str());
-
-        if(Utils::IsValidURLSCE(httpURL.c_str()))
-        {
-            Utils::Log("[VitaDB] url accepted: %s\n", httpURL.c_str());
-            out = httpURL;
-            return SCE_PAF_OK;
-        }
-
-        if(firstCandidate.size() == 0)
-            firstCandidate = httpURL;
-
-        Utils::Log("[VitaDB] url rejected by SceHttp: %s\n", httpURL.c_str());
-    }
-
-    // Nothing passed the reachability probe (SceHttp is picky about redirects
-    // and TLS). Hand the first candidate to SceDownload anyway so that the
-    // background downloader reports its own error instead of failing here.
-    if(firstCandidate.size() != 0)
-    {
-        Utils::Log("[VitaDB] falling back to %s\n", firstCandidate.c_str());
-        out = firstCandidate;
-        return SCE_PAF_OK;
-    }
-
-    Utils::Log("[VitaDB] no viable download url (%u candidates)\n", (unsigned int)urlList.size());
-    return -1;
+    // Every source now shares one probing strategy, see Utils::PickDownloadURL:
+    // resolve the hop chain first, then probe resolved (https, http) and
+    // original (https, http) with a 5s budget each.
+    return Utils::PickDownloadURL(urlList, out);
 }
 
 int VitaDB::GetDownloadURL(Source::Entry& entry, paf::string& out)

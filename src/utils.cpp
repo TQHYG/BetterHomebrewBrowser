@@ -54,7 +54,7 @@ void Utils::HttpsToHttp(const char *src, paf::string& outURL)
     outURL += &src[5];
 }
 
-bool Utils::IsValidURLSCE(const char *url, int *retOut)
+bool Utils::IsValidURLSCE(const char *url, int32_t timeoutMs, int *retOut)
 {
     print("[Utils::IsValidURLSCE] START\n");
 
@@ -72,9 +72,14 @@ bool Utils::IsValidURLSCE(const char *url, int *retOut)
         return false;
     }
 
+    if(timeoutMs <= 0)
+        timeoutMs = 5000;
+
     openArg.ParseUrl(url);
-    openArg.SetOption(4000000, HttpFile::OpenArg::OptionType_ResolveTimeOut);
-	openArg.SetOption(10000000, HttpFile::OpenArg::OptionType_ConnectTimeOut);
+    openArg.SetOption(timeoutMs, HttpFile::OpenArg::OptionType_ResolveTimeOut);
+	openArg.SetOption(timeoutMs, HttpFile::OpenArg::OptionType_ConnectTimeOut);
+	openArg.SetOption(timeoutMs, HttpFile::OpenArg::OptionType_SendTimeOut);
+	openArg.SetOption(timeoutMs, HttpFile::OpenArg::OptionType_RecvTimeOut);
 
     ret = file.Open(&openArg);
 
@@ -445,8 +450,11 @@ int Utils::ResolveFinalURL(const char *url, paf::string &outURL)
     if(!handle)
         return -1;
 
-    // Only the headers are needed; the effective URL is what we are after.
+    // Only the headers are needed; the effective URL is what we are after. Keep
+    // this short: it is the first half of a 5s probe budget.
     curl_easy_setopt(handle, CURLOPT_NOBODY, 1L);
+    curl_easy_setopt(handle, CURLOPT_CONNECTTIMEOUT, 5L);
+    curl_easy_setopt(handle, CURLOPT_TIMEOUT, 10L);
 
     int ret = curl_easy_perform(handle);
 
@@ -469,72 +477,93 @@ int Utils::ResolveFinalURL(const char *url, paf::string &outURL)
 
 int Utils::PickDownloadURL(const std::vector<paf::string> &urls, paf::string &out)
 {
-    paf::string lastResort;
+    out = "";
 
-    Utils::Log("[Utils] probing %u download url candidate(s)\n", (unsigned int)urls.size());
-
-    for(auto &url : urls)
+    if(urls.size() == 0)
     {
-        int err = 0;
-        paf::string httpURL;
-        paf::string finalURL;
-        paf::string finalHttpURL;
-
-        // 1. exactly as the database provides it (usually https). Works when
-        //    the console has TLS (firmware 3.68+, or vitals / tls_fixer).
-        if(Utils::IsValidURLSCE(url.c_str(), &err))
-        {
-            Utils::Log("[Utils] url ok (as-is): %s\n", url.c_str());
-            out = url;
-            return SCE_PAF_OK;
-        }
-        Utils::Log("[Utils] as-is rejected 0x%X: %s\n", err, url.c_str());
-
-        // 2. plain http downgrade, for consoles without TLS support.
-        Utils::HttpsToHttp(url.c_str(), httpURL);
-        if(Utils::IsValidURLSCE(httpURL.c_str(), &err))
-        {
-            Utils::Log("[Utils] url ok (http): %s\n", httpURL.c_str());
-            out = httpURL;
-            return SCE_PAF_OK;
-        }
-        Utils::Log("[Utils] http rejected 0x%X: %s\n", err, httpURL.c_str());
-
-        // 3. resolve the redirect chain ourselves; SceHttp does not always
-        //    follow 3xx the way curl does.
-        if(Utils::ResolveFinalURL(url.c_str(), finalURL) == SCE_OK)
-        {
-            if(Utils::IsValidURLSCE(finalURL.c_str(), &err))
-            {
-                Utils::Log("[Utils] url ok (resolved): %s\n", finalURL.c_str());
-                out = finalURL;
-                return SCE_PAF_OK;
-            }
-
-            Utils::HttpsToHttp(finalURL.c_str(), finalHttpURL);
-            if(Utils::IsValidURLSCE(finalHttpURL.c_str(), &err))
-            {
-                Utils::Log("[Utils] url ok (resolved http): %s\n", finalHttpURL.c_str());
-                out = finalHttpURL;
-                return SCE_PAF_OK;
-            }
-
-            Utils::Log("[Utils] resolved rejected 0x%X: %s\n", err, finalURL.c_str());
-        }
-
-        if(lastResort.size() == 0)
-            lastResort = url;
-    }
-
-    if(lastResort.size() == 0)
-    {
-        Utils::Log("[Utils] no download url at all\n");
+        Utils::Log("[Utils] no download url candidate\n");
         return -1;
     }
 
-    Utils::Log("[Utils] no candidate passed the SceHttp probe, handing %s to SceDownload anyway\n", lastResort.c_str());
-    out = lastResort;
-    return SCE_PAF_OK;
+    // Probe budget per url: 5s, four probes at most.
+    const int32_t probeTimeoutMs = 5000;
+
+    paf::string fallback;
+    int probeIndex = 0;
+
+    for(auto &url : urls)
+    {
+        if(url.size() == 0)
+            continue;
+
+        // Resolve the hop chain once: it tells us whether this is a jump link
+        // (get_hb_url.php, github release assets, ...) or already a direct
+        // link, and it is what SceDownload needs to fetch.
+        paf::string resolved;
+        if(Utils::ResolveFinalURL(url.c_str(), resolved) != SCE_OK)
+            resolved = url;
+
+        bool isDirect = (sce_paf_strcmp(resolved.c_str(), url.c_str()) == 0);
+
+        paf::string resolvedHttp;
+        Utils::HttpsToHttp(resolved.c_str(), resolvedHttp);
+        if(resolvedHttp.size() == 0)
+            resolvedHttp = resolved;
+
+        Utils::Log("[Utils] candidate %s (%s)\n", url.c_str(), isDirect ? "direct" : "jump");
+
+        // Probe order: resolved as-is, resolved http, original as-is, original http.
+        paf::string probes[4];
+        int probeCount = 0;
+
+        probes[probeCount++] = resolved;
+
+        if(sce_paf_strcmp(resolvedHttp.c_str(), resolved.c_str()) != 0)
+            probes[probeCount++] = resolvedHttp;
+
+        if(!isDirect)
+        {
+            probes[probeCount++] = url;
+
+            paf::string urlHttp;
+            Utils::HttpsToHttp(url.c_str(), urlHttp);
+            if(probeCount < 4 && sce_paf_strcmp(urlHttp.c_str(), url.c_str()) != 0)
+                probes[probeCount++] = urlHttp;
+        }
+
+        for(int i = 0; i < probeCount && i < 4; i++)
+        {
+            int err = 0;
+            probeIndex++;
+
+            if(Utils::IsValidURLSCE(probes[i].c_str(), probeTimeoutMs, &err))
+            {
+                Utils::Log("[Utils] probe %d ok: %s\n", probeIndex, probes[i].c_str());
+                out = probes[i];
+                return SCE_PAF_OK;
+            }
+
+            Utils::Log("[Utils] probe %d rejected 0x%X: %s\n", probeIndex, err, probes[i].c_str());
+        }
+
+        if(fallback.size() == 0)
+        {
+            // Hand over the resolved http form: an unresolved jump link cannot
+            // be fetched by the background downloader and failing here would
+            // only hide the real error from bgdl.
+            fallback = resolvedHttp;
+        }
+    }
+
+    if(fallback.size() != 0)
+    {
+        Utils::Log("[Utils] no probe passed, handing %s to SceDownload\n", fallback.c_str());
+        out = fallback;
+        return SCE_PAF_OK;
+    }
+
+    Utils::Log("[Utils] no usable download url\n");
+    return -1;
 }
 
 void Utils::Decapitalise(wchar_t *wcstring)
