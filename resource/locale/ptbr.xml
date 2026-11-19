@@ -64,4 +64,8 @@
     <string src="Doar" id="msg_donations"/>
     <string src="(PayPal link)&#xA;Muito obrigado" id="msg_donate"/>
 
+    <string src="Instalar - Instalar o item agora (pode demorar)" id="msg_install_desc"/>
+    <string src="Salvar arquivo - Salvar o arquivo para instalar manualmente depois" id="msg_save_desc"/>
+    <string src="Instalar" id="msg_install"/>
+    <string src="Salvar arquivo" id="msg_save_file"/>
 </stringset>

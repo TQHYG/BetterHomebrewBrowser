@@ -64,4 +64,8 @@
     <string src="후원" id="msg_donations"/>
     <string src="(페이팔 링크)&#xA;감사합니다." id="msg_donate"/>
 
+    <string src="설치 - 지금 항목을 설치합니다 (시간이 걸릴 수 있음)" id="msg_install_desc"/>
+    <string src="파일 저장 - 나중에 수동으로 설치할 수 있도록 저장합니다" id="msg_save_desc"/>
+    <string src="설치" id="msg_install"/>
+    <string src="파일 저장" id="msg_save_file"/>
 </stringset>

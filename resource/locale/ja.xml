@@ -64,4 +64,8 @@
     <string src="寄付" id="msg_donations"/>
     <string src="(PayPal link)&#xA;ありがとう" id="msg_donate"/>
 
+    <string src="インストール - 今すぐインストールします（時間がかかる場合があります）" id="msg_install_desc"/>
+    <string src="ファイルを保存 - 後で手動でインストールするために保存します" id="msg_save_desc"/>
+    <string src="インストール" id="msg_install"/>
+    <string src="ファイルを保存" id="msg_save_file"/>
 </stringset>

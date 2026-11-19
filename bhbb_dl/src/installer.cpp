@@ -28,8 +28,57 @@
 #include "notice.h"
 #include "dialog.h"
 #include "compressed_file.h"
+#include "bhbb_locale.h"
 
 using namespace paf;
+
+// Strings for the install/save dialog. They live in the app's own resource, so
+// load it once inside the shell process and let PAF resolve the system
+// language, exactly like the app does.
+#define BHBB_APP_RESOURCE "ux0:app/BHBB00001/resource/bhbb_plugin.rco"
+
+static Plugin *s_bhbbStringPlugin = SCE_NULL;
+static bool s_bhbbStringTried = false;
+
+static Plugin *GetBHBBStringPlugin()
+{
+    if(s_bhbbStringTried)
+        return s_bhbbStringPlugin;
+
+    s_bhbbStringTried = true;
+
+    s_bhbbStringPlugin = Plugin::Find("bhbb_dl_strings");
+    if(s_bhbbStringPlugin)
+        return s_bhbbStringPlugin;
+
+    Plugin::InitParam pInit;
+    pInit.name = "bhbb_dl_strings";
+    pInit.caller_name = "__main__";
+    pInit.resource_file = BHBB_APP_RESOURCE;
+
+    Plugin::LoadSync(pInit);
+
+    s_bhbbStringPlugin = Plugin::Find("bhbb_dl_strings");
+    if(!s_bhbbStringPlugin)
+        print("[bhbb_dl] could not load %s, falling back to english\n", BHBB_APP_RESOURCE);
+
+    return s_bhbbStringPlugin;
+}
+
+// Returns the localized string, or the english fallback when the app resource
+// is not available (for example when it is not installed under BHBB00001).
+static const wchar_t *LocalizedString(uint32_t hash, const wchar_t *fallback)
+{
+    Plugin *plugin = GetBHBBStringPlugin();
+    if(plugin)
+    {
+        wchar_t *str = plugin->GetString(hash);
+        if(str && str[0] != 0)
+            return str;
+    }
+
+    return fallback;
+}
 
 #define EXTRACT_PATH "ux0:data/bhbb_prom/"
 #define SAVE_PATH "ux0:/downloads/bhbb/"
@@ -245,7 +294,10 @@ int ProcessExport(::uint32_t id, const char *name, const char *path, const char 
 
     dialog::ButtonCode result;
 
-    str.SetFormattedString(L"\n%s\nInstall - Install item now (may take a while)\nSave File - Save file to be manually installed later", indicator_plugin->GetString("msg_downloaded"));
+    str.SetFormattedString(L"\n%ls\n%ls\n%ls",
+        indicator_plugin->GetString("msg_downloaded"),
+        LocalizedString(msg_install_desc, L"Install - Install item now (may take a while)"),
+        LocalizedString(msg_save_desc, L"Save File - Save file to be manually installed later"));
     dialog::OpenTwoButton(indicator_plugin, nullptr, str.GetWString().c_str(), 0, 0, DecideDialogHandler, &result);
     
     // Me and @SonicMastr found this a long time ago
@@ -258,8 +310,8 @@ int ProcessExport(::uint32_t id, const char *name, const char *path, const char 
     auto acceptButton = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_BUTTON_1);
     auto rejectButton = sce::CommonGuiDialog::Dialog::GetWidget(dialog::Current(), sce::CommonGuiDialog::REGISTER_ID_BUTTON_2);
 
-    acceptButton->SetString(L"Install");
-    rejectButton->SetString(L"Save File");
+    acceptButton->SetString(LocalizedString(msg_install, L"Install"));
+    rejectButton->SetString(LocalizedString(msg_save_file, L"Save File"));
 
     // Might as well make our own title and icon because we can and it looks nicer.
 
@@ -443,7 +495,11 @@ END:
         // Send notification installed successfully 
         if(param->type == BGDLTarget_App)
         {
-            notifParam.title.clear();
+            // Keep the app name and icon. They used to be cleared here, which
+            // left the notification with only the "installed" line and no icon
+            // (PSP builds showed both, because that branch always set them).
+            notifParam.title = name;
+            notifParam.icon_path = param->data_icon;
             // Was AppHighlight with exec_titleid = installedTitleID. A tap then
             // opened/highlighted an app the shell could not resolve, which
             // surfaced as "application not found"; keep the notification but
@@ -453,7 +509,6 @@ END:
             notifParam.display_type = 1; // Highlight
             notifParam.new_flag = 1;     // ^^
             notifParam.action_type = (SceLsdbNotificationParam::Action)0;
-            notifParam.icon_path.clear();
         }
         else if(param->type == BGDLTarget_CompressedFile)
         {

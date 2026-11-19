@@ -80,6 +80,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ../common
     include
     src
+    ../include
     ${VDSUITE_USER_INCLUDE_DIRECTORIES}
     ${VDSUITE_STANDARD_INCLUDE_DIRECTORIES}
     $ENV{SCE_PSP2_SDK_DIR}/target/include

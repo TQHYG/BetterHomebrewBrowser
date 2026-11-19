@@ -64,4 +64,8 @@
     <string src="Lahjoita" id="msg_donations"/>
     <string src="(PayPal-linkki)&#xA;Kiitos" id="msg_donate"/>
 
+    <string src="Asenna - Asenna kohde nyt (voi kestää)" id="msg_install_desc"/>
+    <string src="Tallenna tiedosto - Tallenna tiedosto asennettavaksi myöhemmin" id="msg_save_desc"/>
+    <string src="Asenna" id="msg_install"/>
+    <string src="Tallenna tiedosto" id="msg_save_file"/>
 </stringset>

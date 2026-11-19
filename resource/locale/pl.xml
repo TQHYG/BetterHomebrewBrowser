@@ -65,4 +65,8 @@
     <string src="Wsparcie" id="msg_donations"/>
     <string src="(Link PayPal)&#xA;Dziękuję" id="msg_donate"/>
 
+    <string src="Zainstaluj - zainstaluj teraz (może potrwać)" id="msg_install_desc"/>
+    <string src="Zapisz plik - zapisz plik do ręcznej instalacji później" id="msg_save_desc"/>
+    <string src="Zainstaluj" id="msg_install"/>
+    <string src="Zapisz plik" id="msg_save_file"/>
 </stringset>

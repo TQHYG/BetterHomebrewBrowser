@@ -65,4 +65,8 @@
     <string src="Donner" id="msg_donations"/>
     <string src="(PayPal link)&#xA;Merci" id="msg_donate"/>
 
+    <string src="Installer - Installer l'élément maintenant (peut prendre du temps)" id="msg_install_desc"/>
+    <string src="Enregistrer le fichier - Enregistrer pour une installation manuelle ultérieure" id="msg_save_desc"/>
+    <string src="Installer" id="msg_install"/>
+    <string src="Enregistrer le fichier" id="msg_save_file"/>
 </stringset>
