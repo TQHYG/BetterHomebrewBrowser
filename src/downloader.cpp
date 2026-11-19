@@ -88,8 +88,12 @@ Downloader::~Downloader()
 
 void WriteParam(BGDLParam *param, int32_t dwRes)
 {
+    // snprintf instead of common::FormatString, see Utils::WriteFileAtomically.
+    char paramPath[128];
+    sce_paf_snprintf(paramPath, sizeof(paramPath), "ux0:/bgdl/t/%08x/bhbb.param", dwRes);
+
     int ret = SCE_PAF_OK;
-    auto param_file = LocalFile::Open(common::FormatString("ux0:/bgdl/t/%08x/bhbb.param", dwRes).c_str(), SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666, &ret);
+    auto param_file = LocalFile::Open(paramPath, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666, &ret);
     if(ret < 0)
         return;
 

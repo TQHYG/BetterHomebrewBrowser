@@ -34,13 +34,24 @@ using namespace paf::common;
 
 void Utils::HttpsToHttp(const char *src, paf::string& outURL)
 { 
+    if(!src)
+    {
+        outURL = "";
+        return;
+    }
+
     if(sce_paf_strncmp(src, "https", 5) != 0)
     {
         outURL = src;
         return;
     }
-    
-    outURL = common::FormatString("http%s", &src[5]);
+
+    // Built by hand instead of with common::FormatString: this runs on the
+    // download job thread, and FormatString is also used concurrently by the
+    // icon download workers. Dropping the shared helper here removed the
+    // intermittent garbage urls ("http" -> " C   ") seen in the device log.
+    outURL = "http";
+    outURL += &src[5];
 }
 
 bool Utils::IsValidURLSCE(const char *url, int *retOut)
@@ -194,11 +205,15 @@ namespace
 
     int WriteFileAtomically(const char *dest, const uint8_t *data, size_t size)
     {
-        paf::string tempPath = common::FormatString("%s.part.%08x", dest, sceKernelGetThreadId());
-        LocalFile::RemoveFile(tempPath.c_str());
+        // Plain snprintf instead of common::FormatString: this runs on three
+        // icon download worker threads at once and that helper is not reentrant.
+        char tempPath[512];
+        sce_paf_snprintf(tempPath, sizeof(tempPath), "%s.part.%08x", dest, sceKernelGetThreadId());
+
+        LocalFile::RemoveFile(tempPath);
 
         int ret = SCE_OK;
-        SharedPtr<LocalFile> file = LocalFile::Open(tempPath.c_str(), SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666, &ret);
+        SharedPtr<LocalFile> file = LocalFile::Open(tempPath, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0666, &ret);
         if(ret != SCE_OK || !file.get())
             return ret != SCE_OK ? ret : -1;
 
@@ -209,7 +224,7 @@ namespace
             if(result == 0 || result > size - written)
             {
                 file.reset();
-                LocalFile::RemoveFile(tempPath.c_str());
+                LocalFile::RemoveFile(tempPath);
                 return -1;
             }
             written += result;
@@ -221,14 +236,14 @@ namespace
 
         if(LocalFile::Exists(dest))
         {
-            LocalFile::RemoveFile(tempPath.c_str());
+            LocalFile::RemoveFile(tempPath);
             return SCE_OK;
         }
 
-        ret = sceIoRename(tempPath.c_str(), dest);
+        ret = sceIoRename(tempPath, dest);
         if(ret != SCE_OK)
         {
-            LocalFile::RemoveFile(tempPath.c_str());
+            LocalFile::RemoveFile(tempPath);
             return ret;
         }
 
@@ -289,13 +304,34 @@ int Utils::DownloadFile(const char *url, const char *dest)
 void Utils::Log(const char *fmt, ...)
 {
     static bool ready = false;
+    static paf::thread::Mutex *logMutex = nullptr;
 
-    char line[512];
+    char line[1024];
     va_list args;
 
     va_start(args, fmt);
     sceClibVsnprintf(line, sizeof(line), fmt, args);
     va_end(args);
+
+    size_t len = sce_paf_strlen(line);
+    if(len == 0)
+        return;
+
+    // A long url can fill the whole buffer; keep every record newline
+    // terminated so the file stays parseable when truncated.
+    if(line[len - 1] != '\n')
+    {
+        if(len >= sizeof(line) - 1)
+            len = sizeof(line) - 2;
+
+        line[len] = '\n';
+        line[len + 1] = 0;
+    }
+
+    if(!logMutex)
+        logMutex = new paf::thread::Mutex("BHBB::Log");
+
+    logMutex->Lock();
 
     int ret = SCE_OK;
 
@@ -320,10 +356,10 @@ void Utils::Log(const char *fmt, ...)
 
     ret = SCE_OK;
     SharedPtr<LocalFile> file = LocalFile::Open(BHBB_LOG_PATH, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_APPEND, 0666, &ret);
-    if(ret != SCE_OK || !file.get())
-        return;
+    if(ret == SCE_OK && file.get())
+        file.get()->Write(line, sce_paf_strlen(line));
 
-    file.get()->Write(line, sce_paf_strlen(line));
+    logMutex->Unlock();
 }
 
 int Utils::HttpGet(const char *url, paf::string &out)
